@@ -95,6 +95,16 @@ const S = {
   geo: [],
   diffCache: null,
   seq: 0,
+  // impact co-pilot
+  primeNested: null,
+  multiNested: null,
+  initNested: null,
+  impact: null,
+  impactError: null,
+  impactPending: false,
+  impactSeq: 0,
+  impactMetric: 'risk',
+  impactScenario: 'prime',
 };
 
 const views = [];
@@ -577,7 +587,12 @@ async function postSimulate(perturbation, signal) {
   }
   const json = await res.json();
   const ms = performance.now() - t0;
-  return { rollout: flatten(json.rollout), ms, inferenceMs: json.inference_ms };
+  return {
+    rollout: flatten(json.rollout),
+    nested: json.rollout,
+    ms,
+    inferenceMs: json.inference_ms,
+  };
 }
 
 let inFlight = null;
@@ -593,6 +608,8 @@ async function runBaseline() {
     const r = await postSimulate(null, null);
     S.prime = r.rollout;
     S.multi = r.rollout;
+    S.primeNested = r.nested;
+    S.multiNested = r.nested;
     S.multiSeq += 1;
     S.latency = r.ms;
     S.inferenceMs = r.inferenceMs;
@@ -601,6 +618,8 @@ async function runBaseline() {
     S.error = String(err.message || err);
     S.prime = null;
     S.multi = null;
+    S.primeNested = null;
+    S.multiNested = null;
   } finally {
     S.pending = false;
     setBusy(false);
@@ -620,10 +639,12 @@ async function runShock() {
   if (!S.prime) return;
   if (!S.shock.active) {
     S.multi = S.prime;
+    S.multiNested = S.primeNested;
     S.multiSeq += 1;
     S.diffCache = null;
     S.latency = 0;
     render();
+    refreshImpact();
     return;
   }
   const seq = ++S.seq;
@@ -635,6 +656,7 @@ async function runShock() {
     const r = await postSimulate(buildPerturbation(), inFlight.signal);
     if (seq !== S.seq) return;
     S.multi = r.rollout;
+    S.multiNested = r.nested;
     S.multiSeq += 1;
     S.diffCache = null;
     S.latency = r.ms;
@@ -645,12 +667,14 @@ async function runShock() {
     if (seq !== S.seq) return;
     S.error = String(err.message || err);
     S.multi = null;
+    S.multiNested = null;
   } finally {
     if (seq === S.seq) {
       S.pending = false;
       setBusy(false);
       updateStatus();
       render();
+      refreshImpact();
     }
   }
 }
@@ -673,6 +697,7 @@ async function boot() {
     if (qs.get('api')) S.apiBase = qs.get('api');
 
     await loadGeo();
+    initImpact();
     renderChannelButtons();
     renderWindowButtons();
     renderShockTypeSelect();
@@ -716,9 +741,13 @@ async function loadWindow(id) {
   if (!res.ok) throw new Error(`window ${id}: HTTP ${res.status}`);
   const win = await res.json();
   S.init = flatten(win.init);
+  S.initNested = win.init;
   S.initJSON = JSON.stringify(win.init);
   S.doyJSON = JSON.stringify(win.doy_sincos);
   S.multi = null;
+  S.primeNested = null;
+  S.multiNested = null;
+  S.impact = null;
   S.diffCache = null;
   renderWindowButtons();
   byId('windowHint').textContent = `${win.label} · 3-day analysis at day-of-year ${win.doy} (synthetic).`;
@@ -1000,6 +1029,7 @@ function render() {
   updateLegend();
   syncShockUi();
   updateStatus();
+  renderImpact();
 }
 
 function renderCaptions() {
@@ -1091,11 +1121,13 @@ function wireControls() {
       if (inFlight) inFlight.abort();
       S.seq += 1;
       S.multi = S.prime;
+      S.multiNested = S.primeNested;
       S.multiSeq += 1;
       S.diffCache = null;
       S.pending = false;
       setBusy(false);
       render();
+      refreshImpact();
     } else {
       scheduleShock(0);
     }

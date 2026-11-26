@@ -4,12 +4,9 @@ __pycache__/
 *.whl
 .DS_Store
 .freebuff/
+.run/
+*.log
 
 problem 
-
-.DS_Store
-.freebuff/
-
-
 problem statement.md
 PRD Multiverse of Monsoon Climate Digital Twin.pdf

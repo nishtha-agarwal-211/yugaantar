@@ -16,13 +16,15 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 try:                      # python -m uvicorn dashboard.app:app
     from . import state as state_mod
@@ -30,7 +32,12 @@ except ImportError:       # python dashboard/app.py
     import state as state_mod
 
 HERE = Path(__file__).resolve().parent
+ROOT = HERE.parent
 STATIC = HERE / "static"
+if str(ROOT) not in sys.path:      # the impact package lives at the repo root
+    sys.path.insert(0, str(ROOT))
+
+from impact import assess as assess_impact  # noqa: E402
 API_BASE = os.environ.get("MODEL_API", "http://localhost:8000").rstrip("/")
 
 # Shock primitives the browser turns into a [6,32,36] perturbation delta.
@@ -118,6 +125,7 @@ def bootstrap():
         "default_window": "monsoon_peak",
         "presets": PRESETS,
         "shock_types": SHOCK_TYPES,
+        "impact": True,
         "stats": {
             "mean": [float(x) for x in state_mod.CHANNEL_MEAN],
             "std": [float(x) for x in state_mod.CHANNEL_STD],
@@ -130,6 +138,35 @@ def window(window_id: str):
     if window_id not in state_mod.WINDOWS:
         raise HTTPException(status_code=404, detail=f"unknown window '{window_id}'")
     return state_mod.payload(window_id)
+
+
+@app.post("/api/impact")
+async def impact(request: Request):
+    """Agricultural impact assessment for one live rollout.
+
+    Body: {prime: [steps,6,32,36], multi: optional perturbed rollout,
+           init_states: [3,6,32,36], doy_sincos: [sin, cos]}
+    Returns CRDI, crop water stress and wet-bulb heat stress per cell and
+    per agro-climatic district, plus the prime/multiverse comparison.
+    """
+    try:
+        body = await request.json()
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="invalid JSON body")
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="body must be a JSON object")
+    prime = body.get("prime")
+    init = body.get("init_states")
+    doy = body.get("doy_sincos")
+    if prime is None or init is None or doy is None:
+        raise HTTPException(
+            status_code=400,
+            detail="prime, init_states and doy_sincos are required",
+        )
+    try:
+        return await run_in_threadpool(assess_impact, prime, init, doy, body.get("multi"))
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=400, detail=f"invalid rollout: {exc}")
 
 
 @app.get("/api/health")

@@ -123,6 +123,60 @@
       </div>
     </figure>
   </section>
+
+  <section class="impact" id="impact">
+    <header class="impact-head">
+      <div>
+        <h2>Impact co-pilot · monsoon crop stress &amp; heatwave</h2>
+        <p class="hint">CRDI, Kharif crop water stress and wet-bulb heat stress computed from the
+          same live 10-day <code>tp</code>, <code>t2m</code> and <code>tcwv</code> rollout.</p>
+      </div>
+      <div class="impact-controls">
+        <div class="seg" id="impactMetrics"></div>
+        <div class="seg" id="impactScenario"></div>
+      </div>
+    </header>
+
+    <div class="impact-body">
+      <figure class="view impact-map">
+        <figcaption>
+          <span class="tag" id="impactTitle">District risk</span>
+          <span class="sub" id="impactSub">day 1</span>
+          <span class="val mono" id="impactVal"></span>
+        </figcaption>
+        <div class="canvas-wrap">
+          <canvas id="impactCanvas"></canvas>
+          <div class="tooltip mono" id="impactTip" hidden></div>
+        </div>
+        <div class="diff-scale">
+          <div class="legend-bar" id="impactBar"></div>
+          <div class="legend-ticks mono"><span id="impactLo">0</span><span id="impactMid"></span><span id="impactHi">100</span></div>
+          <div class="legend-note" id="impactNote"></div>
+        </div>
+      </figure>
+
+      <div class="impact-side">
+        <div class="statcards" id="impactStats"></div>
+        <div class="callout" id="impactCompare" hidden></div>
+        <div class="chart-card">
+          <div class="chart-head">
+            <span>Affected crop area by lead day</span>
+            <span class="mono" id="impactChartLegend"></span>
+          </div>
+          <canvas id="impactSeries" height="118"></canvas>
+          <p class="legend-note" id="impactSeriesNote">Area where composite crop water stress ≥ 40 / 100.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="district-table" id="impactDistricts">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="hint impact-foot" id="impactFoot">Waiting for a live rollout…</p>
+  </section>
 </main>
 
 <footer class="foot">
@@ -131,5 +185,6 @@
 </footer>
 
 <script src="/static/app.js" defer></script>
+<script src="/static/impact.js" defer></script>
 </body>
 </html>
