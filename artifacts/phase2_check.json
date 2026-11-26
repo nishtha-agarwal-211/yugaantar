@@ -1,0 +1,583 @@
+{
+  "checks": [
+    {
+      "name": "bundle is compact (~100 KB, no 365-day table)",
+      "status": "PASS",
+      "detail": "77.0 KB compressed, 34,560 coefficients, shape (5, 6, 32, 36), float16 waves + float32 mean"
+    },
+    {
+      "name": "harmonic fit beats a constant annual mean on the training years",
+      "status": "PASS",
+      "detail": "R2 t2m +0.90 tp +0.24 u10 +0.69 v10 +0.63 msl +0.69 tcwv +0.77"
+    },
+    {
+      "name": "float16 wave coefficients are lossless for our purposes",
+      "status": "PASS",
+      "detail": "max |err|/std t2m 3.4e-04 tp 5.8e-04 u10 7.9e-04 v10 9.7e-04 msl 8.6e-04 tcwv 5.7e-04"
+    },
+    {
+      "name": "[sin, cos] wire path equals calendar path",
+      "status": "PASS",
+      "detail": "max diff 0"
+    },
+    {
+      "name": "harmonic climatology beats constant mean on 2020-2021",
+      "status": "PASS",
+      "detail": "RMSE t2m 1.84<5.64 tp 6.62<7.45 u10 1.67<2.77 v10 1.44<2.21 msl 292<500 tcwv 6.44<13.4"
+    },
+    {
+      "name": "harmonics capture the seasonal cycle of t2m",
+      "status": "PASS",
+      "detail": "domain-mean t2m correlation 0.9865"
+    },
+    {
+      "name": "three input days and K autoregressive targets",
+      "status": "PASS",
+      "detail": "hist (3, 6, 32, 36), target (10, 6, 32, 36)"
+    },
+    {
+      "name": "window counts are sane",
+      "status": "PASS",
+      "detail": "5466 train / 360 val windows"
+    },
+    {
+      "name": "rollout[k] is the day after init_last + k days",
+      "status": "PASS",
+      "detail": "max calendar misalignment 0 day(s)"
+    },
+    {
+      "name": "no window crosses its split boundary",
+      "status": "PASS",
+      "detail": "0 out-of-period endpoints; train 2005-01-01..2019-12-31, val 2020-01-01..2021-12-31"
+    },
+    {
+      "name": "delta parameterisation is exact",
+      "status": "PASS",
+      "detail": "max |hist[-1] + cumsum(delta) - target| = 2.38e-07"
+    },
+    {
+      "name": "encode/decode round-trip is faithful",
+      "status": "PASS",
+      "detail": "max err/std 2.02e-06, min decoded rain 0.000 mm/day"
+    },
+    {
+      "name": "physics guards never touch real observations",
+      "status": "PASS",
+      "detail": "clamped values: 0 (guards only fire on impossible states)"
+    },
+    {
+      "name": "linear channels standardised with stats.json",
+      "status": "PASS",
+      "detail": "5/6 channels use the shipped mean/std; tp uses log1p space"
+    },
+    {
+      "name": "anomalies are state minus harmonic climatology of the same day",
+      "status": "PASS",
+      "detail": "max diff 0.00e+00 (anom == anom_seq[0])"
+    },
+    {
+      "name": "doy embedding is the source day and the forecast day (doy + k)",
+      "status": "PASS",
+      "detail": "max diff 0.00e+00"
+    },
+    {
+      "name": "teacher-forced history at step k ends on the true day t+k",
+      "status": "PASS",
+      "detail": "max diff 0.00e+00"
+    },
+    {
+      "name": "default collate produces finite batches",
+      "status": "PASS",
+      "detail": "hist (4, 3, 6, 32, 36), anom (4, 6, 32, 36), anom_seq (4, 11, 6, 32, 36), static (4, 4, 32, 36), doy (4, 8, 10), target (4, 10, 6, 32, 36), delta (4, 10, 6, 32, 36), init_index (4,), init_doy (4,)"
+    },
+    {
+      "name": "parameters under the 3 M budget",
+      "status": "PASS",
+      "detail": "262,374 parameters"
+    },
+    {
+      "name": "purely local operations",
+      "status": "PASS",
+      "detail": "6 ConvNeXt-style 3x3 blocks, no attention/linear/global pooling"
+    },
+    {
+      "name": "receptive radius keeps day-1 locality",
+      "status": "PASS",
+      "detail": "\u00b17 cells/day (contract allows up to ~11 at day 1)"
+    },
+    {
+      "name": "zero head reproduces persistence to codec round-trip precision",
+      "status": "PASS",
+      "detail": "head output exactly 0; max |rollout - repeat(init[-1])| = 1.5e-05 (encode/decode round-off)"
+    },
+    {
+      "name": "deterministic and null-shock invariant",
+      "status": "PASS",
+      "detail": "bitwise identical repeated calls; zero perturbation changes nothing"
+    },
+    {
+      "name": "14-step rollout stays finite, rain >= 0, t2m in [-40, 60] C",
+      "status": "PASS",
+      "detail": "violations: none, rain min 0.000 mm/day"
+    },
+    {
+      "name": "10-step rollout under 500 ms on 4 CPU threads",
+      "status": "PASS",
+      "detail": "19.6 ms median (2.0 ms/step), 4 threads"
+    },
+    {
+      "name": "weights bundle round-trips bit-exactly",
+      "status": "PASS",
+      "detail": "1194 KB single-file bundle (weights + climatology + statics)"
+    },
+    {
+      "name": "loss decreases during the smoke fit",
+      "status": "PASS",
+      "detail": "0.1274 -> 0.0847"
+    },
+    {
+      "name": "every rollout passes the physical validity gate",
+      "status": "PASS",
+      "detail": "0 failing windows"
+    },
+    {
+      "name": "day-8 spatial variance stays in the anti-blur band",
+      "status": "PASS",
+      "detail": "anti-blur points 10.0/10 (band 0.40-2.50)"
+    },
+    {
+      "name": "smoke model beats persistence at day 4 (hard gate)",
+      "status": "PASS",
+      "detail": "mean SS +0.060"
+    },
+    {
+      "name": "null shock changes nothing",
+      "status": "PASS",
+      "detail": "zero perturbation is bit-identical to the unperturbed rollout"
+    },
+    {
+      "name": "shocks produce a non-zero, numerically stable response",
+      "status": "PASS",
+      "detail": "causality 12.2/15 across 4 shock cases"
+    },
+    {
+      "name": "day-1 response is localised near the shocked box",
+      "status": "PASS",
+      "detail": "near_frac 1.00 1.00 1.00 1.00"
+    }
+  ],
+  "metrics": {
+    "climatology": {
+      "bundle_bytes": 78808,
+      "float32_tensor_bytes": 138240,
+      "n_coefficients": 34560,
+      "coefficients_per_cell_channel": 5,
+      "train_r2": {
+        "t2m": 0.8997492209086363,
+        "tp": 0.24080653482902115,
+        "u10": 0.6885628880585224,
+        "v10": 0.6271574202776542,
+        "msl": 0.6903711169042728,
+        "tcwv": 0.7679970493495901
+      },
+      "rain_space": "linear"
+    },
+    "climatology_float16_max_error_in_std": {
+      "t2m": 0.0003377334214746952,
+      "tp": 0.0005771753494627774,
+      "u10": 0.0007901009521447122,
+      "v10": 0.000972358335275203,
+      "msl": 0.0008582115988247097,
+      "tcwv": 0.0005744557711295784
+    },
+    "climatology_val_rmse": {
+      "t2m": 1.8372642993927002,
+      "tp": 6.6244707107543945,
+      "u10": 1.6654431819915771,
+      "v10": 1.4445050954818726,
+      "msl": 292.4997863769531,
+      "tcwv": 6.441697597503662
+    },
+    "dataset": {
+      "train": {
+        "split": "train",
+        "period": [
+          "2005-01-01",
+          "2019-12-31"
+        ],
+        "n_windows": 5466,
+        "stride_days": 1,
+        "horizon": 10,
+        "in_steps": 3,
+        "first_window": {
+          "init_last": "2005-01-03",
+          "first_target": "2005-01-04",
+          "last_target": "2005-01-13"
+        },
+        "item_shapes": {
+          "hist": [
+            3,
+            6,
+            32,
+            36
+          ],
+          "anom": [
+            6,
+            32,
+            36
+          ],
+          "anom_seq": [
+            11,
+            6,
+            32,
+            36
+          ],
+          "static": [
+            4,
+            32,
+            36
+          ],
+          "doy": [
+            8,
+            10
+          ],
+          "target": [
+            10,
+            6,
+            32,
+            36
+          ],
+          "delta": [
+            10,
+            6,
+            32,
+            36
+          ]
+        },
+        "clim_latent_table_bytes": 10119168
+      },
+      "val": {
+        "split": "val",
+        "period": [
+          "2020-01-01",
+          "2021-12-31"
+        ],
+        "n_windows": 360,
+        "stride_days": 2,
+        "horizon": 10,
+        "in_steps": 3,
+        "first_window": {
+          "init_last": "2020-01-03",
+          "first_target": "2020-01-04",
+          "last_target": "2020-01-13"
+        },
+        "item_shapes": {
+          "hist": [
+            3,
+            6,
+            32,
+            36
+          ],
+          "anom": [
+            6,
+            32,
+            36
+          ],
+          "anom_seq": [
+            11,
+            6,
+            32,
+            36
+          ],
+          "static": [
+            4,
+            32,
+            36
+          ],
+          "doy": [
+            8,
+            10
+          ],
+          "target": [
+            10,
+            6,
+            32,
+            36
+          ],
+          "delta": [
+            10,
+            6,
+            32,
+            36
+          ]
+        },
+        "clim_latent_table_bytes": 10119168
+      },
+      "sample_shapes": {
+        "hist": [
+          3,
+          6,
+          32,
+          36
+        ],
+        "anom": [
+          6,
+          32,
+          36
+        ],
+        "anom_seq": [
+          11,
+          6,
+          32,
+          36
+        ],
+        "static": [
+          4,
+          32,
+          36
+        ],
+        "doy": [
+          8,
+          10
+        ],
+        "target": [
+          10,
+          6,
+          32,
+          36
+        ],
+        "delta": [
+          10,
+          6,
+          32,
+          36
+        ],
+        "init_index": [],
+        "init_doy": []
+      }
+    },
+    "model": {
+      "config": {
+        "hidden": 96,
+        "blocks": 6,
+        "expansion": 2,
+        "in_steps": 3,
+        "static_planes": 4,
+        "doy_features": 8,
+        "max_step_delta": 4.0
+      },
+      "parameters": 262374,
+      "in_channels": 36,
+      "receptive_radius_cells": 7
+    },
+    "rollout_ms_10_steps": {
+      "median": 19.55837500281632,
+      "all": [
+        19.54933299566619,
+        20.037624999531545,
+        19.409707994782366,
+        19.55837500281632,
+        19.574542006012052
+      ],
+      "threads": 4
+    },
+    "smoke_training": {
+      "steps": 300,
+      "batch_size": 4,
+      "micro_batch": 8,
+      "lr": 0.002,
+      "seconds": 118.21005175000755,
+      "lead_samples": 12000,
+      "lead_samples_per_second": 101.51420985228724,
+      "train_loss_first": 0.12735501632094384,
+      "train_loss_last": 0.08472644489258527,
+      "val_loss": 0.08214466497302056
+    },
+    "rollout_skill": {
+      "n_windows": 80,
+      "per_lead": {
+        "1": {
+          "rmse_model": {
+            "t2m": 0.8207418228710359,
+            "tp": 5.136599522374703,
+            "u10": 0.8801447662852248,
+            "v10": 0.8477225296344313,
+            "msl": 145.22494873685164,
+            "tcwv": 2.906105025138667
+          },
+          "rmse_persistence": {
+            "t2m": 0.9407189281593904,
+            "tp": 6.374245803501337,
+            "u10": 1.0360767828847512,
+            "v10": 1.0314495331479758,
+            "msl": 180.75465009634314,
+            "tcwv": 3.3994023427932114
+          },
+          "rmse_climatology": {
+            "t2m": 1.6121107157377856,
+            "tp": 6.800472163962152,
+            "u10": 1.6335718856287698,
+            "v10": 1.4153566894993985,
+            "msl": 252.28141895504194,
+            "tcwv": 6.205654419376741
+          },
+          "ss_vs_best_ref": {
+            "t2m": 0.12753767538525196,
+            "tp": 0.1941635637029877,
+            "u10": 0.15050237508977338,
+            "v10": 0.17812505373172371,
+            "msl": 0.19656313871069975,
+            "tcwv": 0.14511295454636108
+          },
+          "mean_ss": 0.16533412686113294,
+          "csi_model": 0.4144602362212686,
+          "csi_persistence": 0.3819614121884284,
+          "csi_climatology": 0.2249475117938931
+        },
+        "4": {
+          "rmse_model": {
+            "t2m": 1.5022291781506714,
+            "tp": 6.762564455960448,
+            "u10": 1.5326744606332803,
+            "v10": 1.3365290015206484,
+            "msl": 233.0069155524151,
+            "tcwv": 5.538839369251384
+          },
+          "rmse_persistence": {
+            "t2m": 1.7102452187118307,
+            "tp": 9.523922352258511,
+            "u10": 1.9301444418693603,
+            "v10": 1.8727969513608145,
+            "msl": 297.495038996871,
+            "tcwv": 6.790737472871349
+          },
+          "rmse_climatology": {
+            "t2m": 1.597590825717965,
+            "tp": 6.967969298253479,
+            "u10": 1.6288966781999297,
+            "v10": 1.4119273592314798,
+            "msl": 250.4826306142598,
+            "tcwv": 6.092554644697325
+          },
+          "ss_vs_best_ref": {
+            "t2m": 0.059690908355359173,
+            "tp": 0.029478436758398896,
+            "u10": 0.05907202025421476,
+            "v10": 0.05340101756500504,
+            "msl": 0.06976817122604029,
+            "tcwv": 0.09088392435312309
+          },
+          "mean_ss": 0.06038241308535688,
+          "csi_model": 0.24894960400929406,
+          "csi_persistence": 0.2049044420795735,
+          "csi_climatology": 0.22034450017186613
+        },
+        "8": {
+          "rmse_model": {
+            "t2m": 1.6602725435076284,
+            "tp": 7.141953205470583,
+            "u10": 1.7485485770780251,
+            "v10": 1.4535563632248696,
+            "msl": 261.56414710145606,
+            "tcwv": 6.394649247857031
+          },
+          "rmse_persistence": {
+            "t2m": 1.943264990219833,
+            "tp": 9.495322597949833,
+            "u10": 2.150818775308044,
+            "v10": 1.9150287364924878,
+            "msl": 335.17240681763934,
+            "tcwv": 7.512780434633908
+          },
+          "rmse_climatology": {
+            "t2m": 1.5762315692025464,
+            "tp": 6.8466837480465035,
+            "u10": 1.667072630996762,
+            "v10": 1.4122952989173914,
+            "msl": 251.50246041217707,
+            "tcwv": 6.021724696531475
+          },
+          "ss_vs_best_ref": {
+            "t2m": -0.053317657092479376,
+            "tp": -0.043125908584331185,
+            "u10": -0.04887366307042518,
+            "v10": -0.029215606919535286,
+            "msl": -0.04000631513818709,
+            "tcwv": -0.061929857328144156
+          },
+          "mean_ss": -0.04607816802218371,
+          "csi_model": 0.2454442792622314,
+          "csi_persistence": 0.1915026256635395,
+          "csi_climatology": 0.22233968706371818
+        }
+      },
+      "variance_ratio_day8": {
+        "t2m": 0.9789336323738098,
+        "tp": 0.541015625,
+        "u10": 1.0132896900177002,
+        "v10": 0.7829883098602295,
+        "msl": 0.960875391960144,
+        "tcwv": 0.9220772981643677
+      },
+      "anti_blur_points_of_10": 10.0,
+      "validity_failures": [],
+      "mean_ss_all_leads": 0.009642220482952166
+    },
+    "causality": {
+      "null_consistent": true,
+      "points_of_15": 12.1875,
+      "checks": [
+        {
+          "date": "2020-07-15",
+          "shock": "warm_ocean",
+          "finite": true,
+          "nonzero": true,
+          "stable": true,
+          "near_frac_day1": 0.9979182481765747,
+          "localized": true,
+          "far_frac_max": 0.0009733313345350325,
+          "no_teleport": true,
+          "propagates": false
+        },
+        {
+          "date": "2020-07-15",
+          "shock": "monsoon_stall",
+          "finite": true,
+          "nonzero": true,
+          "stable": true,
+          "near_frac_day1": 0.9999451637268066,
+          "localized": true,
+          "far_frac_max": 2.647584187798202e-05,
+          "no_teleport": true,
+          "propagates": false
+        },
+        {
+          "date": "2021-10-10",
+          "shock": "warm_ocean",
+          "finite": true,
+          "nonzero": true,
+          "stable": true,
+          "near_frac_day1": 0.9989088177680969,
+          "localized": true,
+          "far_frac_max": 0.0004754258261527866,
+          "no_teleport": true,
+          "propagates": true
+        },
+        {
+          "date": "2021-10-10",
+          "shock": "monsoon_stall",
+          "finite": true,
+          "nonzero": true,
+          "stable": true,
+          "near_frac_day1": 0.9992994666099548,
+          "localized": true,
+          "far_frac_max": 0.0008673295378684998,
+          "no_teleport": true,
+          "propagates": false
+        }
+      ]
+    }
+  },
+  "elapsed_seconds": 121.82501608300663,
+  "failures": []
+}

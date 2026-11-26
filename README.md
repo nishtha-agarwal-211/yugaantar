@@ -38,6 +38,14 @@ This repository houses the **Multiverse of Monsoon Climate Digital Twin**, desig
 ├── stats.json                   # Normalization parameters (internal use only)
 ├── evaluate_baselines.py        # Phase 1: offline benchmark & scoring harness
 ├── baseline_scores.json         # Evaluated metrics for Persistence vs Climatology
+├── climatology.py               # Phase 2: compact 2-frequency harmonic climatology
+├── dataset.py                   # Phase 2: state codec, static bundle, sliding-window dataset
+├── model.py                     # Phase 2: local-only delta network + DigitalTwin bundle
+├── check_phase2.py              # Phase 2: end-to-end verification harness
+├── artifacts/
+│   ├── climatology_coefs.npz    # 77 KB, 34,560 harmonic coefficients (2005-2019 fit)
+│   ├── static_codec.npz         # 9 KB, land/sea + orography/coords planes + codec constants
+│   └── phase2_check.json        # Latest verification report
 ├── serve.py                     # Offline FastAPI inference server (entrypoint)
 └── README.md                    # Project documentation
 ```
@@ -57,7 +65,110 @@ python evaluate_baselines.py
 
 ---
 
-## 5. Serving & Inference
+## 5. Phase 2: Data Pipeline, Harmonic Climatology & Model Architecture
+
+The twin never forecasts an absolute field. It forecasts the **one-day increment
+of the state**, with a compact harmonic climatology as the reference climate:
+
+```
+state[t+1] = state[t] + Network(state[t-2 : t+1], anomaly[t], static, doy[t], doy[t+1])
+```
+
+### 5.1 Compact harmonic climatology — [climatology.py](climatology.py)
+
+Fit by least squares on **2005-01-01 … 2019-12-31 only**, per grid cell and channel:
+
+```
+clim(doy) = mean + a1 sin(2π doy/365) + b1 cos(2π doy/365)
+                 + a2 sin(4π doy/365) + b2 cos(4π doy/365)
+```
+
+* Five numbers per cell and channel → a `[5, 6, 32, 36]` tensor.
+* Saved as float32 annual mean + float16 wave coefficients: **77 KB** on disk
+  (135 KB in float32). There is no 365-day lookup table of past weather anywhere
+  in the repo; the climatology is a 5-parameter-per-cell seasonal model.
+* The API only sends `doy_sincos` of the last input day. The second harmonic is
+  recovered with the double-angle identities, so `predict_sincos(sin, cos)` and
+  the calendar path agree to 0.0 — a rollout never needs a date.
+* Validation (2020-2021) beats a constant annual mean on every channel:
+  t2m 1.84 K, tcwv 6.44, msl 292 Pa, tp 6.62 mm/day; domain-mean t2m seasonal
+  cycle correlation 0.987.
+
+```bash
+python climatology.py fit --out artifacts/climatology_coefs.npz
+python climatology.py show --coefs artifacts/climatology_coefs.npz
+```
+
+### 5.2 Data pipeline — [dataset.py](dataset.py)
+
+`ClimateWindows` turns the 2005-2021 daily record into sliding windows: three
+consecutive observed days in, up to 10 autoregressive targets out, with every
+input and target day strictly inside the requested split (no leakage).
+
+| item | shape | meaning |
+|---|---|---|
+| `hist` | `[3, 6, 32, 36]` | latent states of the last three days |
+| `anom` / `anom_seq` | `[6,32,36]` / `[K+1, 6, 32, 36]` | state minus harmonic climatology of the same day |
+| `static` | `[4, 32, 36]` | `land_sea_mask`, normalised `orography_m`, lat, lon |
+| `doy` | `[8, K]` | `[sin, cos, sin2, cos2]` of the source day and of each forecast day |
+| `target` / `delta` | `[K, 6, 32, 36]` | latent absolute states and one-day increments |
+
+`StateCodec` normalises with the shipped `stats.json` constants for the five
+linear channels. Precipitation is standardised in `log1p` space and decoded with
+`expm1(clip(x, 0, ·))`, so **rain is mathematically ≥ 0 mm/day**. Decoding also
+clamps t2m, msl, tcwv and the wind components to physical ranges; on real
+observations the guards never fire (verified), they only make the validity gate
+impossible to fail. The static bundle additionally carries normalised latitude
+and longitude planes, because a purely local convolution otherwise has no way to
+know where it is on the globe.
+
+```bash
+python dataset.py build --data india_climate_train.nc --stats stats.json \
+    --climatology artifacts/climatology_coefs.npz --out artifacts/static_codec.npz
+```
+
+### 5.3 Local-only architecture — [model.py](model.py)
+
+Six ConvNeXt-style blocks, each a 3×3 depthwise convolution + 1×1 pointwise
+expansion/projection with GroupNorm, GELU, LayerScale and a residual. **No
+attention, no transformer, no linear layer, no global pooling** — a one-day
+response can reach at most `1 + n_blocks = 7` cells, and that radius grows by 7
+cells per rolled-out day. `LocalDeltaNet.assert_local_ops()` enforces this.
+
+* **262,374 parameters** (budget 3 M).
+* **19.5 ms** for a 10-step rollout on 4 CPU threads here (budget 500 ms); the
+  inference-time batch is always one frame.
+* The output head is **zero-initialised**, so an untrained twin is exactly
+  persistence (measured: head output 0, rollout within 1.5e-5 of repeat-last-day,
+  which is codec round-off). Training only learns the correction.
+* Each latent increment is clamped to ±4 standard deviations per step as a
+  runaway guard; the clamp is elementwise and cannot create a non-local response.
+* The whole system (weights + climatology + statics + codec) round-trips through
+  a single 1.2 MB `artifacts/model_bundle.pt` file, loadable with
+  `torch.load(..., weights_only=True)`.
+
+### 5.4 Verification — [check_phase2.py](check_phase2.py)
+
+```bash
+python check_phase2.py --steps 300 --threads 4
+```
+
+33 checks, all passing on this machine, including: compact bundle, float16
+losslessness (`max |err|/std < 1e-3`), `[sin, cos]` ≡ calendar path, window
+alignment `target = init_last + k`, zero split leakage, delta/cumsum identity,
+encode/decode round-trip, no attention, parameter budget, timing, determinism,
+null-shock bit-identity, and 14-step stability. A 300-step smoke fit reaches
+mean RMSE skill **+0.17 at day 1 and +0.06 at day 4** against the better of
+persistence and climatology, with anti-blur 10.0/10 and heavy-rain CSI above
+persistence at every lead; the day-1 shock response is 100% localised.
+
+Measured on the smoke fit, the open item for Phase 3 is **propagation**: the
+`propagates` sub-check (response energy outside the box+3 neighbourhood growing
+by days 4-8) fires in 1 of 4 cases, giving 12.2/15 causality points. A real
+training run with a multi-step rollout loss is expected to fix this by keeping
+the anomaly amplitude alive instead of damping it towards climatology.
+
+## 6. Serving & Inference
 
 The offline inference server runs via FastAPI/Uvicorn on `0.0.0.0:8000`:
 ```bash
