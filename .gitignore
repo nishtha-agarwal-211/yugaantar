@@ -1,0 +1,15 @@
+.venv/
+*.nc
+__pycache__/
+*.whl
+.DS_Store
+.freebuff/
+
+problem 
+
+.DS_Store
+.freebuff/
+
+
+problem statement.md
+PRD Multiverse of Monsoon Climate Digital Twin.pdf
