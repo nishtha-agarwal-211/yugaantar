@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multiverse of Monsoon — Interactive Digital Twin</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="progress" id="progress"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark">◈</span>
+    <div class="titles">
+      <h1>Multiverse of Monsoon</h1>
+      <p>Climate digital twin · 32 × 36 India grid · live <code>POST /simulate</code></p>
+    </div>
+  </div>
+  <div class="status" id="status">
+    <span class="dot" id="dot"></span>
+    <span id="statusText">connecting…</span>
+    <span class="latency mono" id="latency"></span>
+  </div>
+</header>
+
+<div class="banner" id="banner" hidden></div>
+
+<main>
+  <aside class="side">
+    <section class="card">
+      <h2>Analysis window</h2>
+      <div class="seg" id="windows"></div>
+      <p class="hint" id="windowHint">Three consecutive days of synthetic monsoon analysis on the contract grid.</p>
+    </section>
+
+    <section class="card">
+      <h2>Channel</h2>
+      <div class="seg vert" id="channels"></div>
+      <div class="legend">
+        <div class="legend-bar" id="legendBar"></div>
+        <div class="legend-ticks mono"><span id="legendMin">0</span><span id="legendMid"></span><span id="legendMax">0</span></div>
+        <div class="legend-note" id="legendUnit"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Lead time</h2>
+      <div class="timeline">
+        <button id="play" class="btn icon" title="Play / pause (space)" aria-label="Play timeline">▶</button>
+        <input id="dayRange" type="range" min="1" max="10" step="1" value="1" aria-label="Forecast lead day">
+        <span class="badge mono" id="dayLabel">Day 1</span>
+      </div>
+      <p class="hint">One 10-step rollout per window; scrubbing is instant.</p>
+    </section>
+
+    <section class="card">
+      <h2>Multiverse shock</h2>
+      <div class="presets" id="presets"></div>
+
+      <div class="field">
+        <label for="shockType">Shock type</label>
+        <select id="shockType"></select>
+      </div>
+
+      <div id="shockSliders" class="sliders"></div>
+
+      <div class="field range">
+        <label for="radiusRange">Radius <span class="mono" id="radiusLabel">6.0°</span></label>
+        <input id="radiusRange" type="range" min="0.5" max="12" step="0.5" value="6">
+      </div>
+
+      <div class="center-row mono" id="centerLabel">13.5°N 88.0°E</div>
+
+      <div class="actions">
+        <button id="clearShock" class="btn">Remove shock</button>
+        <button id="rerun" class="btn primary">Re-run</button>
+      </div>
+      <p class="hint">Click the map to move the shock centre.</p>
+    </section>
+  </aside>
+
+  <section class="views" id="views">
+    <figure class="view" data-mode="prime">
+      <figcaption>
+        <span class="tag">Timeline Prime</span>
+        <span class="sub" id="cap-prime">baseline rollout</span>
+        <span class="val mono" id="val-prime"></span>
+      </figcaption>
+      <div class="canvas-wrap">
+        <canvas class="base"></canvas>
+        <canvas class="flow"></canvas>
+        <div class="tooltip mono" hidden></div>
+      </div>
+    </figure>
+
+    <figure class="view" data-mode="multi">
+      <figcaption>
+        <span class="tag">Multiverse</span>
+        <span class="sub" id="cap-multi">perturbed rollout</span>
+        <span class="val mono" id="val-multi"></span>
+      </figcaption>
+      <div class="canvas-wrap">
+        <canvas class="base"></canvas>
+        <canvas class="flow"></canvas>
+        <div class="tooltip mono" hidden></div>
+      </div>
+    </figure>
+
+    <figure class="view diff" data-mode="diff">
+      <figcaption>
+        <span class="tag">Difference</span>
+        <span class="sub">multiverse − prime</span>
+        <span class="val mono" id="val-diff"></span>
+      </figcaption>
+      <div class="canvas-wrap">
+        <canvas class="base"></canvas>
+        <div class="tooltip mono" hidden></div>
+      </div>
+      <div class="diff-scale">
+        <div class="legend-bar diverging" id="diffBar"></div>
+        <div class="legend-ticks mono"><span id="diffLo">0</span><span>0</span><span id="diffHi">0</span></div>
+      </div>
+    </figure>
+  </section>
+</main>
+
+<footer class="foot">
+  <span id="footNote">Every frame is a live inference call to the model server.</span>
+  <span class="mono" id="footMeta"></span>
+</footer>
+
+<script src="/static/app.js" defer></script>
+</body>
+</html>

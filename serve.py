@@ -34,6 +34,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 # --------------------------------------------------------------------------- #
@@ -246,6 +247,16 @@ except Exception as exc:      # keep the process alive; /health reports not read
 MODEL_NAME = STATE.name
 LOAD_S = STATE.load_s
 app = FastAPI(title="monsoon digital twin")
+
+# The Phase 5 dashboard (dashboard/app.py) runs on its own loopback port and
+# POSTs /simulate straight from the browser, so allow loopback origins only.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"^http://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_methods=["POST", "GET", "OPTIONS"],
+    allow_headers=["*"],
+    max_age=600,
+)
 
 
 # --------------------------------------------------------------------------- #

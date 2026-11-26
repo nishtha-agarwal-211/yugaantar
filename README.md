@@ -47,6 +47,10 @@ This repository houses the **Multiverse of Monsoon Climate Digital Twin**, desig
 │   ├── static_codec.npz         # 9 KB, land/sea + orography/coords planes + codec constants
 │   └── phase2_check.json        # Latest verification report
 ├── serve.py                     # Offline FastAPI inference server (entrypoint)
+├── dashboard/                   # Phase 5: interactive multiverse dashboard
+│   ├── app.py                   # FastAPI UI host + bootstrap API (port 8001)
+│   ├── state.py                 # Synthetic 3-day analysis windows (32x36 grid)
+│   └── static/                  # Canvas map UI (vanilla JS), coastline, styles
 └── README.md                    # Project documentation
 ```
 
@@ -179,3 +183,41 @@ Verify compliance using the official schema validator:
 ```bash
 python -m monsoon_r1.schema_validator http://localhost:8000
 ```
+
+---
+
+## 6. Phase 5: Interactive Multiverse Dashboard
+
+The desk-review dashboard is a separate process in `dashboard/`; the graded
+entrypoint stays `serve.py` at the repo root.
+
+```bash
+python serve.py --port 8000            # model server (contract unchanged)
+python dashboard/app.py --port 8001    # dashboard at http://127.0.0.1:8001
+```
+
+- **Live, never pre-rendered.** Each panel is a `POST http://localhost:8000/simulate`
+  issued by the browser itself. One 10-step call per run; the timeline slider only
+  indexes into the returned leads, so scrubbing Day 1–10 costs no extra requests.
+  A local round trip is ~130 ms for the 1.25 MB response.
+- **Map.** 32×36 cells, lat 6.5–37.5, lon 65.5–100.5, equirectangular projection with
+  the bundled simplified coastline (`dashboard/static/geo/india.json`).
+- **Channels.** `t2m` (K→°C), `tp`, `u10`/`v10` (animated streamlines), `msl` (Pa→hPa),
+  `tcwv`, each with its own colour ramp and units.
+- **Shock sandbox.** Presets (Bay of Bengal SST warming +3 K, Arabian Sea wind stall
+  −40%, Himalayan cold surge −5 K, null control), or click the map to move the centre;
+  radius and intensity sliders build a 6×32×36 perturbation delta with a cosine taper
+  in physical units, which is exactly what `/simulate` expects.
+- **Dual / difference view.** Timeline Prime, Multiverse and Difference
+  (perturbed − baseline) side by side, on a symmetric anomaly scale taken from the
+  largest response across all 10 leads.
+- **Analysis windows.** The benchmark's windows are hidden, so `dashboard/state.py`
+  builds three deterministic synthetic monsoon windows from the shipped statistics and
+  coastline. The UI labels them as synthetic. Point `MODEL_API` (or `?api=`) at another
+  host to drive a different server.
+- `serve.py` allows loopback CORS origins so the dashboard, served from its own port,
+  can call `/simulate` directly.
+
+If `model_weights.pt` is absent the server answers with its persistence fallback and the
+dashboard shows a banner: the difference map then shows the injected shock but no
+wave propagation.
