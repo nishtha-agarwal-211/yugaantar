@@ -1,223 +1,221 @@
-# Multiverse of Monsoon: Climate Digital Twin of India
+# Multiverse of Monsoon — Climate Digital Twin of India
 
-> Spatiotemporal Earth-System modeling, autoregressive rollout forecasting, and counterfactual climate shock simulation for India (32 × 36 grid, 1° resolution). Inspired by ISRO's Bharatiya Antariksh Hackathon PS-5.
+A spatiotemporal earth-system twin for the 1° India grid (32 × 36 cells, 6.5–37.5° N,
+65.5–100.5° E) across six atmospheric channels. It does two things:
 
----
+1. **Timeline Prime** — given three consecutive observed days, roll the atmospheric state
+   forward day by day for 10 days without drifting, exploding, or collapsing into a
+   climatological blur.
+2. **Multiverse** — inject a localised shock (Bay of Bengal warming, Arabian Sea wind stall,
+   Himalayan cold surge), and watch how far and how fast it ripples across India.
 
-## 1. Project Overview
+Everything runs offline on CPU: no weather API, no network call, no calendar lookup.
 
-This repository houses the **Multiverse of Monsoon Climate Digital Twin**, designed for:
-1. **Timeline Prime (Autoregressive Rollout)**: Given 3 consecutive days of observed atmospheric state over India across 6 dynamic physical channels, predict the daily weather forward day-by-day for 10+ days without exploding, drifting, or collapsing into blurry averages.
-2. **Multiverse (Causal Shock Simulation)**: Inject localized initial perturbations (e.g., Bay of Bengal SST warming, Arabian Sea wind stall) and simulate how atmospheric waves and anomalies ripple across India obeying physical locality and speed limits.
-
----
-
-## 2. Atmospheric Domain & Channels
-
-- **Grid Resolution**: 32 × 36 cells of 1° × 1° spatial resolution.
-  - Latitude: $6.5^\circ\text{N} \dots 37.5^\circ\text{N}$ (South to North)
-  - Longitude: $65.5^\circ\text{E} \dots 100.5^\circ\text{E}$ (West to East)
-- **Dynamic Channels (Physical Units)**:
-  1. `t2m`: 2-meter air temperature ($\text{K}$)
-  2. `tp`: Daily total precipitation ($\text{mm/day}$, non-negative)
-  3. `u10`: 10-meter eastward wind ($\text{m/s}$)
-  4. `v10`: 10-meter northward wind ($\text{m/s}$)
-  5. `msl`: Mean sea-level pressure ($\text{Pa}$)
-  6. `tcwv`: Total column water vapour ($\text{kg/m}^2$)
-- **Static Channels**: `land_sea_mask` (0/1) and `orography_m` (surface elevation in meters).
+| # | channel | unit | notes |
+|---|---|---|---|
+| 0 | `t2m` | K | 2 m temperature |
+| 1 | `tp` | mm/day | daily total precipitation, never negative |
+| 2 | `u10` | m/s | 10 m eastward wind |
+| 3 | `v10` | m/s | 10 m northward wind |
+| 4 | `msl` | Pa | mean sea-level pressure |
+| 5 | `tcwv` | kg/m² | total column water vapour |
 
 ---
 
-## 3. Repository Structure
-
-```
-.
-├── API_CONTRACT.md              # Exact Round 1 wire format & scoring rules
-├── PRD Multiverse of Monsoon... # Full Product Requirements Document
-├── problem statement.md         # Official track mission & constraints
-├── stats.json                   # Normalization parameters (internal use only)
-├── evaluate_baselines.py        # Phase 1: offline benchmark & scoring harness
-├── baseline_scores.json         # Evaluated metrics for Persistence vs Climatology
-├── climatology.py               # Phase 2: compact 2-frequency harmonic climatology
-├── dataset.py                   # Phase 2: state codec, static bundle, sliding-window dataset
-├── model.py                     # Phase 2: local-only delta network + DigitalTwin bundle
-├── check_phase2.py              # Phase 2: end-to-end verification harness
-├── artifacts/
-│   ├── climatology_coefs.npz    # 77 KB, 34,560 harmonic coefficients (2005-2019 fit)
-│   ├── static_codec.npz         # 9 KB, land/sea + orography/coords planes + codec constants
-│   └── phase2_check.json        # Latest verification report
-├── serve.py                     # Offline FastAPI inference server (entrypoint)
-├── dashboard/                   # Phase 5: interactive multiverse dashboard
-│   ├── app.py                   # FastAPI UI host + bootstrap API (port 8001)
-│   ├── state.py                 # Synthetic 3-day analysis windows (32x36 grid)
-│   └── static/                  # Canvas map UI (vanilla JS), coastline, styles
-└── README.md                    # Project documentation
-```
-
----
-
-## 4. Phase 1: Reference Baselines & Scoring Harness
-
-We implement and evaluate two reference baselines following the exact metric formulas in `monsoon_r1.scoring`:
-1. **Persistence**: Repeats `init_states[-1]` across all lead days.
-2. **Harmonic Climatology**: 2-frequency annual Fourier harmonic decomposition fitted on 2005–2019 data and evaluated at future day-of-year phases ($\sin, \cos$).
-
-To run the offline benchmark:
-```bash
-python evaluate_baselines.py
-```
-
----
-
-## 5. Phase 2: Data Pipeline, Harmonic Climatology & Model Architecture
-
-The twin never forecasts an absolute field. It forecasts the **one-day increment
-of the state**, with a compact harmonic climatology as the reference climate:
-
-```
-state[t+1] = state[t] + Network(state[t-2 : t+1], anomaly[t], static, doy[t], doy[t+1])
-```
-
-### 5.1 Compact harmonic climatology — [climatology.py](climatology.py)
-
-Fit by least squares on **2005-01-01 … 2019-12-31 only**, per grid cell and channel:
-
-```
-clim(doy) = mean + a1 sin(2π doy/365) + b1 cos(2π doy/365)
-                 + a2 sin(4π doy/365) + b2 cos(4π doy/365)
-```
-
-* Five numbers per cell and channel → a `[5, 6, 32, 36]` tensor.
-* Saved as float32 annual mean + float16 wave coefficients: **77 KB** on disk
-  (135 KB in float32). There is no 365-day lookup table of past weather anywhere
-  in the repo; the climatology is a 5-parameter-per-cell seasonal model.
-* The API only sends `doy_sincos` of the last input day. The second harmonic is
-  recovered with the double-angle identities, so `predict_sincos(sin, cos)` and
-  the calendar path agree to 0.0 — a rollout never needs a date.
-* Validation (2020-2021) beats a constant annual mean on every channel:
-  t2m 1.84 K, tcwv 6.44, msl 292 Pa, tp 6.62 mm/day; domain-mean t2m seasonal
-  cycle correlation 0.987.
+## Quick start
 
 ```bash
-python climatology.py fit --out artifacts/climatology_coefs.npz
-python climatology.py show --coefs artifacts/climatology_coefs.npz
+python -m venv .venv && source .venv/bin/activate
+pip install torch numpy scipy xarray netCDF4 fastapi uvicorn
+
+python serve.py --port 8000          # model API (graded entrypoint)
+python dashboard/app.py --port 8001  # dashboard at http://127.0.0.1:8001
 ```
 
-### 5.2 Data pipeline — [dataset.py](dataset.py)
+`serve.py` needs `model_weights.pt` next to it. **This workspace does not contain that
+file yet** (see [Submission status](#submission-status)); without it the server answers
+from a contract-valid persistence fallback and `/health` says so.
 
-`ClimateWindows` turns the 2005-2021 daily record into sliding windows: three
-consecutive observed days in, up to 10 autoregressive targets out, with every
-input and target day strictly inside the requested split (no leakage).
+---
 
-| item | shape | meaning |
-|---|---|---|
-| `hist` | `[3, 6, 32, 36]` | latent states of the last three days |
-| `anom` / `anom_seq` | `[6,32,36]` / `[K+1, 6, 32, 36]` | state minus harmonic climatology of the same day |
-| `static` | `[4, 32, 36]` | `land_sea_mask`, normalised `orography_m`, lat, lon |
-| `doy` | `[8, K]` | `[sin, cos, sin2, cos2]` of the source day and of each forecast day |
-| `target` / `delta` | `[K, 6, 32, 36]` | latent absolute states and one-day increments |
+## Repository layout
 
-`StateCodec` normalises with the shipped `stats.json` constants for the five
-linear channels. Precipitation is standardised in `log1p` space and decoded with
-`expm1(clip(x, 0, ·))`, so **rain is mathematically ≥ 0 mm/day**. Decoding also
-clamps t2m, msl, tcwv and the wind components to physical ranges; on real
-observations the guards never fire (verified), they only make the validity gate
-impossible to fail. The static bundle additionally carries normalised latitude
-and longitude planes, because a purely local convolution otherwise has no way to
-know where it is on the globe.
+```
+serve.py               FastAPI model server: POST /health, POST /simulate (graded entrypoint)
+train.py               physics-informed training loop -> model_weights.pt
+model.py               local ConvNeXt delta twin (LocalDeltaNet + DigitalTwin bundle)
+dataset.py             state codec, static bundle, sliding-window dataset
+climatology.py         2-frequency harmonic climatology (fit / evaluate / save)
+evaluate_baselines.py  persistence and climatology reference scores
+check_phase2.py        end-to-end verification harness (33 checks)
+audit_repo.py          repository integrity scan (anti-cheat, code health, submission checks)
+brief.pdf              two-page submission brief
+stats.json             per-channel mean/std used by the codec
+artifacts/             climatology coefficients, static bundle, latest verification report
+dashboard/             multiverse UI (FastAPI host + canvas map, vanilla JS)
+API_CONTRACT.md        exact wire format and scoring rules
+```
+
+---
+
+## Architecture
+
+The twin never predicts an absolute field. It predicts the **one-day increment** of the
+state, relative to a compact harmonic climatology:
+
+```
+state[t+1] = state[t] + f(state[t-2 : t+1], anomaly[t], static, doy[t], doy[t+1])
+```
+
+* **Local ConvNeXt core** (`model.py`). Six blocks, each `3×3` depthwise convolution →
+  GroupNorm → `1×1` expansion/projection → GELU, with LayerScale `1e-2` and a residual.
+  **262,374 parameters.** There is no attention, no transformer, no global pooling and no
+  linear layer — `LocalDeltaNet.assert_local_ops()` fails loudly if one is added. One day's
+  response can reach at most **7 cells**, and that radius grows by 7 cells per rolled-out
+  day, so a shock propagates instead of teleporting.
+* **Served U-Net** (`serve.py`). The graded server wraps the same local blocks in a
+  three-stage decoder (775,078 parameters, width 32/64/128, two max-pool stages) with a
+  tanh-bounded increment of at most 2σ per step. It shares the block design but not the
+  strict locality budget: measured day-1 sensitivity already spans the whole domain, which
+  is the open item F3 in `brief.pdf`. Serving the local core is the compliant fix.
+* **Static conditioning.** Land–sea mask, normalised orography, and normalised latitude and
+  longitude planes are model inputs, so a purely convolutional model still knows where it is.
+* **One bundle.** Weights, climatology, statics and the codec fit in a single ~1.2 MB
+  checkpoint loadable with `torch.load(..., weights_only=True)`; a 10-step rollout costs
+  ~20 ms on four CPU threads.
+
+### Physics and stability
+
+* **Harmonic climatology, not a date table.** `clim(doy) = mean + a₁sin t + b₁cos t +
+  a₂sin 2t + b₂cos 2t` with `t = 2π·doy/365`, fitted by least squares on 2005–2019 only:
+  34,560 coefficients, **77 KB**. The API only sends `doy_sincos` of the last input day; the
+  second harmonic is recovered with double-angle identities, so inference never touches a
+  calendar and the `[sin, cos]` and calendar paths agree exactly.
+* **Rain cannot go negative.** `tp` is standardised in `log1p` space and decoded with
+  `expm1(clip(x, 0, ·))` — a smooth, softplus-family positive map. The validity gate then
+  floors `tp`/`tcwv` at 0 and clamps `t2m` to 233.16–333.14 K (−40…+60 °C) in float64.
+* **Anti-drift.** Delta parameterisation keeps persistence and variance; the output head is
+  zero-initialised so an untrained twin is bit-exactly persistence; increments are clamped
+  per step; the model is deterministic, so a zero perturbation is bit-identical to the
+  unperturbed call.
+* **Anti-blur.** Training adds Sobel gradient-magnitude matching and a spatial-variance band
+  (0.55–1.8) on the final unrolled step, tighter than the scored 0.40–2.50 band.
+
+---
+
+## Training
+
+Training needs `india_climate_train.nc`: `data[time, channel, lat, lon]` in contract channel
+order plus a `static[2, lat, lon]` field, 2005–2021. It is **not** committed (multi-year
+daily archives are out of scope for the repo) and is not present in this workspace.
 
 ```bash
+# 1. fit the harmonic climatology (2005-2019 only)
+python climatology.py fit --data india_climate_train.nc \
+    --out artifacts/climatology_coefs.npz --rain-space linear
+
+# 2. build the static bundle + codec
 python dataset.py build --data india_climate_train.nc --stats stats.json \
     --climatology artifacts/climatology_coefs.npz --out artifacts/static_codec.npz
+
+# 3. train -> model_weights.pt (the file serve.py loads)
+python train.py --data india_climate_train.nc --out model_weights.pt \
+    --epochs 16 --batch-size 8 --max-unroll 4 --curriculum 0.25 0.50 0.75
+
+# quick smoke run first
+python train.py --data india_climate_train.nc --epochs 2 --max-train-batches 8
 ```
 
-### 5.3 Local-only architecture — [model.py](model.py)
-
-Six ConvNeXt-style blocks, each a 3×3 depthwise convolution + 1×1 pointwise
-expansion/projection with GroupNorm, GELU, LayerScale and a residual. **No
-attention, no transformer, no linear layer, no global pooling** — a one-day
-response can reach at most `1 + n_blocks = 7` cells, and that radius grows by 7
-cells per rolled-out day. `LocalDeltaNet.assert_local_ops()` enforces this.
-
-* **262,374 parameters** (budget 3 M).
-* **19.5 ms** for a 10-step rollout on 4 CPU threads here (budget 500 ms); the
-  inference-time batch is always one frame.
-* The output head is **zero-initialised**, so an untrained twin is exactly
-  persistence (measured: head output 0, rollout within 1.5e-5 of repeat-last-day,
-  which is codec round-off). Training only learns the correction.
-* Each latent increment is clamped to ±4 standard deviations per step as a
-  runaway guard; the clamp is elementwise and cannot create a non-local response.
-* The whole system (weights + climatology + statics + codec) round-trips through
-  a single 1.2 MB `artifacts/model_bundle.pt` file, loadable with
-  `torch.load(..., weights_only=True)`.
-
-### 5.4 Verification — [check_phase2.py](check_phase2.py)
+`train.py` uses a multi-step autoregressive curriculum (loss backpropagated through 1→4
+unrolled days), a latitude-weighted MSE + L1 compound loss, 4× weight on cells above
+10 mm/day plus a differentiable soft-CSI term, the anti-blur terms above, and perturbation
+augmentation in 20 % of batches with locality/energy/boundedness regularisers. Checkpoints
+are selected on 2020–2021 validation: `skill_day4 + 0.5·mean_CSI(1,4,8) − 0.5·anti-blur
+failures`, and the run records whether persistence is beaten at day 4.
 
 ```bash
-python check_phase2.py --steps 300 --threads 4
+python evaluate_baselines.py     # persistence vs climatology reference scores
+python check_phase2.py --steps 300 --threads 4   # 33 end-to-end checks
 ```
 
-33 checks, all passing on this machine, including: compact bundle, float16
-losslessness (`max |err|/std < 1e-3`), `[sin, cos]` ≡ calendar path, window
-alignment `target = init_last + k`, zero split leakage, delta/cumsum identity,
-encode/decode round-trip, no attention, parameter budget, timing, determinism,
-null-shock bit-identity, and 14-step stability. A 300-step smoke fit reaches
-mean RMSE skill **+0.17 at day 1 and +0.06 at day 4** against the better of
-persistence and climatology, with anti-blur 10.0/10 and heavy-rain CSI above
-persistence at every lead; the day-1 shock response is 100% localised.
-
-Measured on the smoke fit, the open item for Phase 3 is **propagation**: the
-`propagates` sub-check (response energy outside the box+3 neighbourhood growing
-by days 4-8) fires in 1 of 4 cases, giving 12.2/15 causality points. A real
-training run with a multi-step rollout loss is expected to fix this by keeping
-the anomaly amplitude alive instead of damping it towards climatology.
-
-## 6. Serving & Inference
-
-The offline inference server runs via FastAPI/Uvicorn on `0.0.0.0:8000`:
-```bash
-python serve.py --port 8000
-```
-
-Verify compliance using the official schema validator:
-```bash
-python -m monsoon_r1.schema_validator http://localhost:8000
+`check_phase2.py` needs both the NetCDF and the organiser's `monsoon_r1` team kit
+(`pip install monsoon_r1_kit-1.0.0-py3-none-any.whl`); neither ships in this repo, and the
+harness exits with an explicit message when they are missing.
 ```
 
 ---
 
-## 6. Phase 5: Interactive Multiverse Dashboard
-
-The desk-review dashboard is a separate process in `dashboard/`; the graded
-entrypoint stays `serve.py` at the repo root.
+## Serving (`serve.py`)
 
 ```bash
-python serve.py --port 8000            # model server (contract unchanged)
-python dashboard/app.py --port 8001    # dashboard at http://127.0.0.1:8001
+python serve.py --port 8000        # binds 0.0.0.0, as the judge runs it
 ```
 
-- **Live, never pre-rendered.** Each panel is a `POST http://localhost:8000/simulate`
-  issued by the browser itself. One 10-step call per run; the timeline slider only
-  indexes into the returned leads, so scrubbing Day 1–10 costs no extra requests.
-  A local round trip is ~130 ms for the 1.25 MB response.
-- **Map.** 32×36 cells, lat 6.5–37.5, lon 65.5–100.5, equirectangular projection with
-  the bundled simplified coastline (`dashboard/static/geo/india.json`).
-- **Channels.** `t2m` (K→°C), `tp`, `u10`/`v10` (animated streamlines), `msl` (Pa→hPa),
-  `tcwv`, each with its own colour ramp and units.
-- **Shock sandbox.** Presets (Bay of Bengal SST warming +3 K, Arabian Sea wind stall
-  −40%, Himalayan cold surge −5 K, null control), or click the map to move the centre;
-  radius and intensity sliders build a 6×32×36 perturbation delta with a cosine taper
-  in physical units, which is exactly what `/simulate` expects.
-- **Dual / difference view.** Timeline Prime, Multiverse and Difference
-  (perturbed − baseline) side by side, on a symmetric anomaly scale taken from the
-  largest response across all 10 leads.
-- **Analysis windows.** The benchmark's windows are hidden, so `dashboard/state.py`
-  builds three deterministic synthetic monsoon windows from the shipped statistics and
-  coastline. The UI labels them as synthetic. Point `MODEL_API` (or `?api=`) at another
-  host to drive a different server.
-- `serve.py` allows loopback CORS origins so the dashboard, served from its own port,
-  can call `/simulate` directly.
+* `POST /health` → `{"status": "ready", "model_name": "..."}` once weights are loaded.
+* `POST /simulate` with `{"init_states": [3,6,32,36], "doy_sincos": [sin, cos], "steps": 10,
+  "perturbation": null | [6,32,36]}` → `{"rollout": [steps,6,32,36], "inference_ms": ...}`,
+  plain nested JSON lists, physical units in and out, `rollout[k]` = day `k+1` after the last
+  input day. See `API_CONTRACT.md` for the exact contract.
+* The perturbation is added to `init_states[-1]` before the first step, exactly as specified.
+* Loading happens at import, `/health` reports not-ready on failure, and CORS is restricted to
+  loopback origins so the dashboard (a different port) can call it from the browser.
+* No checkpoint → clean persistence fallback: contract-valid output, `model_name` says
+  `fallback-persistence (model_weights.pt MISSING)`.
 
-If `model_weights.pt` is absent the server answers with its persistence fallback and the
-dashboard shows a banner: the difference map then shows the injected shock but no
-wave propagation.
+---
+
+## Dashboard (`dashboard/`)
+
+```bash
+python dashboard/app.py --port 8001        # UI on http://127.0.0.1:8001
+MODEL_API=http://127.0.0.1:9000 python dashboard/app.py --port 8001   # other host
+```
+
+* **Live, never pre-rendered.** Every run is one browser `POST /simulate` (~130 ms, 1.25 MB);
+  the day slider only indexes the returned leads.
+* **Flow.** Pick an analysis window (monsoon peak, break phase, pre-monsoon heat — synthetic,
+  and labelled as such) → pick a shock preset (BoB +3 K/+15 % tcwv, Arabian Sea stall −40 %,
+  Himalayan cold surge −5 K, null control) or click the map to move the centre and set
+  radius/intensity → Timeline Prime, Multiverse and Difference side by side on a symmetric
+  anomaly scale → scrub day 1–10 per channel → read the crop-belt panel.
+* **Map.** Equirectangular 32 × 36 grid with the bundled simplified coastline, per-channel
+  colour ramps and units, animated streamlines for wind.
+* **Crop belt.** 112 land cells over lat 18–26° N, lon 73–88° E with lat-weighted rain, wind
+  and heat-degree-day anomalies — the agronomic reading of a multiverse scenario.
+* A server-side `/api/health` probe shows which model answered and banners the fallback.
+
+---
+
+## Repository integrity scan
+
+```bash
+python audit_repo.py          # human readable, exit 1 on a critical flag
+python audit_repo.py --json   # machine readable
+```
+
+The organiser's own command is
+`python -c "import monsoon_r1.repo_scan as rs; from pathlib import Path; print(rs.scan(Path('.')))"`,
+which needs the `monsoon_r1` team kit; the wheel is not part of the repository and is not on
+PyPI, so `audit_repo.py` re-implements the same checks offline.
+
+Seven checks, mirroring `monsoon_r1.repo_scan`: external endpoints in
+inference code, hardcoded dates in inference code, committed multi-year archives (> 400
+daily slices), checkpoint presence and size (< 2 GB), a real training pipeline, a clean
+server/UI split, and that every module parses on the scoring interpreter.
+
+Latest run on this workspace: **6 of 7 checks pass, 1 critical** — no checkpoint is
+present, so `serve.py` is serving its persistence fallback. Everything else is clean:
+0 non-loopback URLs, no calendar in the served path, largest committed file 111 KB,
+10 modules parse, training pipeline and server/UI separation intact.
+
+## Submission status
+
+| item | state |
+|---|---|
+| `brief.pdf` (2 pages) | complete — architecture, physics, failure modes, dashboard, impact, multiverse results |
+| repo integrity scan | 6/7 pass; `weights/present` is the single open flag |
+| checkpoint (`model_weights.pt`) | **missing** — run `python train.py --data india_climate_train.nc` |
+| served-model day-1 locality | **open** (U-Net F3) — the local ConvNeXt core is the compliant path |
+
+Both open items are fixable from this repo alone: the checkpoint is one training command
+once the NetCDF is available, and the locality item is a serving-architecture switch.

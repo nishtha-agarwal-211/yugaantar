@@ -573,12 +573,17 @@ def print_reference_bar(overall_p: dict, overall_c: dict, cmp: dict, leads: tupl
         print(row)
     print("  mean RMSE skill of climatology vs persistence (1 - RMSE_c / RMSE_p): "
           + ", ".join(f"d{k} {cmp['per_lead'][str(k)]['mean_skill_of_climatology_vs_persistence']:+.3f}" for k in leads))
-    print("  heavy-rain CSI bar (better of P and C per window): "
-          + ", ".join(
-              f"d{k} {cmp['per_lead'][str(k)]['csi']['best_reference_csi_mean']:.3f} "
-              f"({max(cmp['per_lead'][str(k)]['csi']['best_reference_source_counts'],
-                      key=cmp['per_lead'][str(k)]['csi']['best_reference_source_counts'].get)[:4]})"
-              for k in leads))
+
+    # The f-string expressions below are kept on one line: a multi-line
+    # expression inside a single-quoted f-string is a syntax error before
+    # Python 3.12, and this module has to import on every scoring box.
+    csi_cells = []
+    for k in leads:
+        csi = cmp["per_lead"][str(k)]["csi"]
+        counts = csi["best_reference_source_counts"]
+        best_src = max(counts, key=counts.get)[:4]
+        csi_cells.append(f"d{k} {csi['best_reference_csi_mean']:.3f} ({best_src})")
+    print("  heavy-rain CSI bar (better of P and C per window): " + ", ".join(csi_cells))
 
 
 # --------------------------------------------------------------------------- #
