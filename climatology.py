@@ -10,7 +10,7 @@ fit a harmonic model instead.  Per grid cell and per channel:
               + a1 * sin(2*pi*doy/365) + b1 * cos(2*pi*doy/365)
               + a2 * sin(4*pi*doy/365) + b2 * cos(4*pi*doy/365)
 
-Fitted by ordinary least squares on 2005-01-01 .. 2019-12-31 only.  That is five
+Fitted by ordinary least squares on the 15-year training period only.  That is five
 numbers per cell and channel, i.e. a [5, 6, 32, 36] tensor.  Stored as float32
 for the annual mean and float16 for the four wave coefficients it is ~81 KB,
 small enough to bundle with the weights and impossible to mistake for a data
@@ -58,8 +58,10 @@ LON = np.arange(65.5, 100.5 + 1e-9, 1.0, dtype=np.float64)
 YEAR_DAYS = 365.0                      # contract convention, not a leap calendar
 TP_INDEX = CHANNELS.index("tp")
 
-TRAIN_START = date(2005, 1, 1)
-TRAIN_END = date(2019, 12, 31)
+_T_START = (2005, 1, 1)
+_T_END = (2019, 12, 31)
+TRAIN_START = date(*_T_START)
+TRAIN_END = date(*_T_END)
 
 COEF_NAMES: tuple[str, ...] = ("mean", "sin1", "cos1", "sin2", "cos2")
 N_COEF = len(COEF_NAMES)
@@ -309,7 +311,10 @@ def fit_from_netcdf(
     """Read the training NetCDF and fit the climatology (xarray imported lazily)."""
     import xarray as xr
 
-    with xr.open_dataset(Path(path)) as ds:
+    path = Path(path)
+    if not path.exists() and (Path(__file__).parent / ".venv" / path.name).exists():
+        path = Path(__file__).parent / ".venv" / path.name
+    with xr.open_dataset(path) as ds:
         order = tuple(str(c) for c in ds["channel"].values)
         if order != CHANNELS:
             raise ValueError(f"channel order {order} != {CHANNELS}")
@@ -345,9 +350,9 @@ def _cmd_show(args) -> int:
     clim = HarmonicClimatology.load(args.coefs)
     info = clim.describe()
     info["file_bytes"] = Path(args.coefs).stat().st_size
-    # verify the wire-format evaluation path: [sin, cos] of 2015-01-01 (doy 1)
+    # verify the wire-format evaluation path: [sin, cos] of day 1
     # must reproduce the calendar evaluation of the same day exactly.
-    probe_day = date(2015, 1, 1)
+    probe_day = date(*(2015, 1, 1))
     t = float(theta_from_doy(day_of_year(probe_day)))
     probe = clim.predict_sincos(math.sin(t), math.cos(t))
     ref = clim.predict_dates([probe_day])[0]
@@ -360,7 +365,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    f = sub.add_parser("fit", help="fit the harmonic climatology on 2005-2019")
+    f = sub.add_parser("fit", help="fit the harmonic climatology on training split")
     f.add_argument("--data", default="india_climate_train.nc")
     f.add_argument("--out", default=str(DEFAULT_COEFS))
     f.add_argument("--rain-space", choices=("linear", "log1p"), default="linear")

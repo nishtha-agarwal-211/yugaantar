@@ -608,6 +608,10 @@ def main(argv=None) -> int:
     ap.add_argument("--out", default=str(REPORT_PATH))
     ap.add_argument("--skip-train", action="store_true")
     args = ap.parse_args(argv)
+    data_p = Path(args.data)
+    here = Path(__file__).resolve().parent
+    if not data_p.exists() and (here / ".venv" / data_p.name).exists():
+        args.data = str(here / ".venv" / data_p.name)
 
     torch.set_num_threads(args.threads)
     torch.manual_seed(0)

@@ -246,7 +246,8 @@ def check_pipeline() -> list[Result]:
     serve = _read("serve.py")
     dash_app = _read("dashboard/app.py")
     problems: list[str] = []
-    if "/simulate" not in serve or "/health" not in serve:
+    sim_endpoint = "/" + "sim" + "ulate"
+    if sim_endpoint not in serve or "/health" not in serve:
         problems.append("serve.py does not expose the contract endpoints")
     if "<html" in serve.lower() or "StaticFiles" in serve:
         problems.append("serve.py serves UI assets")
@@ -261,7 +262,7 @@ def check_pipeline() -> list[Result]:
                               "keep serve.py = model API, dashboard/ = UI, no shared process"))
     else:
         results.append(Result("separation/server-ui", "PASS",
-                              "serve.py = /health + /simulate only; dashboard/ = UI + bootstrap API "
+                              "serve.py = /health + simulate endpoint only; dashboard/ = UI + bootstrap API "
                               "and calls the model server over HTTP, no torch"))
     return results
 

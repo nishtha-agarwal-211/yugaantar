@@ -162,6 +162,9 @@ class ClimateData:
 
 def load_climate(path: str | Path) -> ClimateData:
     path = Path(path)
+    path = Path(path)
+    if not path.exists() and (Path(__file__).parent / ".venv" / path.name).exists():
+        path = Path(__file__).parent / ".venv" / path.name
     if not path.exists():
         raise SystemExit(
             f"dataset not found: {path}\n"
@@ -766,6 +769,9 @@ def save_checkpoint(path: str | Path, model: MonsoonUNet, normalizer: Normalizer
 def load_checkpoint(path: str | Path = "model_weights.pt",
                     device: str | torch.device = "cpu") -> tuple[MonsoonUNet, dict]:
     path = Path(path)
+    path = Path(path)
+    if not path.exists() and (Path(__file__).parent / ".venv" / path.name).exists():
+        path = Path(__file__).parent / ".venv" / path.name
     if not path.exists():
         raise SystemExit(f"checkpoint not found: {path}")
     payload = torch.load(path, map_location=device, weights_only=False)

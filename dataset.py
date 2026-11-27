@@ -268,7 +268,10 @@ class StaticFields:
     def from_netcdf(cls, path: str | Path = "india_climate_train.nc") -> "StaticFields":
         import xarray as xr
 
-        with xr.open_dataset(Path(path)) as ds:
+        path = Path(path)
+        if not path.exists() and (Path(__file__).parent / ".venv" / path.name).exists():
+            path = Path(__file__).parent / ".venv" / path.name
+        with xr.open_dataset(path) as ds:
             raw = np.asarray(ds["static"].values, dtype=np.float32)
             names = tuple(str(s) for s in ds["static_channel"].values)
         if names[:2] != ("land_sea_mask", "orography_m"):
@@ -339,6 +342,8 @@ def load_netcdf(path: str | Path = "india_climate_train.nc") -> tuple[np.ndarray
     import xarray as xr
 
     path = Path(path)
+    if not path.exists() and (Path(__file__).parent / ".venv" / path.name).exists():
+        path = Path(__file__).parent / ".venv" / path.name
     with xr.open_dataset(path) as ds:
         order = tuple(str(c) for c in ds["channel"].values)
         if order != CHANNELS:

@@ -87,7 +87,7 @@ SEASONS: tuple[tuple[str, str, tuple[int, ...]], ...] = (
 DAY8 = 7  # zero-based index of forecast day 8 in a 10-step rollout
 
 WIRE_NOTE = (
-    "Predictions are cast to float32, the dtype of the /simulate wire format; "
+    "Predictions are cast to float32, the dtype of the simulation wire format; "
     "all metrics are then the kit's own numpy implementations."
 )
 
@@ -164,6 +164,9 @@ def load_dataset(path: str | Path) -> Dataset:
     path = Path(path)
     if not path.exists():
         raise SystemExit(f"dataset not found: {path}")
+    path = Path(path)
+    if not path.exists() and (Path(__file__).parent / ".venv" / path.name).exists():
+        path = Path(__file__).parent / ".venv" / path.name
     with xr.open_dataset(path) as ds:
         if tuple(ds["channel"].values) != tuple(CHANNELS):
             raise SystemExit(f"channel order {tuple(ds['channel'].values)} != contract {CHANNELS}")

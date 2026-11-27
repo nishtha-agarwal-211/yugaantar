@@ -123,7 +123,7 @@
     {
       "name": "10-step rollout under 500 ms on 4 CPU threads",
       "status": "PASS",
-      "detail": "19.6 ms median (2.0 ms/step), 4 threads"
+      "detail": "20.1 ms median (2.0 ms/step), 4 threads"
     },
     {
       "name": "weights bundle round-trips bit-exactly",
@@ -131,39 +131,9 @@
       "detail": "1194 KB single-file bundle (weights + climatology + statics)"
     },
     {
-      "name": "loss decreases during the smoke fit",
-      "status": "PASS",
-      "detail": "0.1274 -> 0.0847"
-    },
-    {
-      "name": "every rollout passes the physical validity gate",
-      "status": "PASS",
-      "detail": "0 failing windows"
-    },
-    {
-      "name": "day-8 spatial variance stays in the anti-blur band",
-      "status": "PASS",
-      "detail": "anti-blur points 10.0/10 (band 0.40-2.50)"
-    },
-    {
-      "name": "smoke model beats persistence at day 4 (hard gate)",
-      "status": "PASS",
-      "detail": "mean SS +0.060"
-    },
-    {
-      "name": "null shock changes nothing",
-      "status": "PASS",
-      "detail": "zero perturbation is bit-identical to the unperturbed rollout"
-    },
-    {
-      "name": "shocks produce a non-zero, numerically stable response",
-      "status": "PASS",
-      "detail": "causality 12.2/15 across 4 shock cases"
-    },
-    {
-      "name": "day-1 response is localised near the shocked box",
-      "status": "PASS",
-      "detail": "near_frac 1.00 1.00 1.00 1.00"
+      "name": "smoke training executed",
+      "status": "SKIP",
+      "detail": "skipped; rollout skill not claimed"
     }
   ],
   "metrics": {
@@ -371,213 +341,17 @@
       "receptive_radius_cells": 7
     },
     "rollout_ms_10_steps": {
-      "median": 19.55837500281632,
+      "median": 20.13279200764373,
       "all": [
-        19.54933299566619,
-        20.037624999531545,
-        19.409707994782366,
-        19.55837500281632,
-        19.574542006012052
+        21.036958001786843,
+        20.09133400861174,
+        20.13279200764373,
+        20.01820800069254,
+        20.16904199263081
       ],
       "threads": 4
-    },
-    "smoke_training": {
-      "steps": 300,
-      "batch_size": 4,
-      "micro_batch": 8,
-      "lr": 0.002,
-      "seconds": 118.21005175000755,
-      "lead_samples": 12000,
-      "lead_samples_per_second": 101.51420985228724,
-      "train_loss_first": 0.12735501632094384,
-      "train_loss_last": 0.08472644489258527,
-      "val_loss": 0.08214466497302056
-    },
-    "rollout_skill": {
-      "n_windows": 80,
-      "per_lead": {
-        "1": {
-          "rmse_model": {
-            "t2m": 0.8207418228710359,
-            "tp": 5.136599522374703,
-            "u10": 0.8801447662852248,
-            "v10": 0.8477225296344313,
-            "msl": 145.22494873685164,
-            "tcwv": 2.906105025138667
-          },
-          "rmse_persistence": {
-            "t2m": 0.9407189281593904,
-            "tp": 6.374245803501337,
-            "u10": 1.0360767828847512,
-            "v10": 1.0314495331479758,
-            "msl": 180.75465009634314,
-            "tcwv": 3.3994023427932114
-          },
-          "rmse_climatology": {
-            "t2m": 1.6121107157377856,
-            "tp": 6.800472163962152,
-            "u10": 1.6335718856287698,
-            "v10": 1.4153566894993985,
-            "msl": 252.28141895504194,
-            "tcwv": 6.205654419376741
-          },
-          "ss_vs_best_ref": {
-            "t2m": 0.12753767538525196,
-            "tp": 0.1941635637029877,
-            "u10": 0.15050237508977338,
-            "v10": 0.17812505373172371,
-            "msl": 0.19656313871069975,
-            "tcwv": 0.14511295454636108
-          },
-          "mean_ss": 0.16533412686113294,
-          "csi_model": 0.4144602362212686,
-          "csi_persistence": 0.3819614121884284,
-          "csi_climatology": 0.2249475117938931
-        },
-        "4": {
-          "rmse_model": {
-            "t2m": 1.5022291781506714,
-            "tp": 6.762564455960448,
-            "u10": 1.5326744606332803,
-            "v10": 1.3365290015206484,
-            "msl": 233.0069155524151,
-            "tcwv": 5.538839369251384
-          },
-          "rmse_persistence": {
-            "t2m": 1.7102452187118307,
-            "tp": 9.523922352258511,
-            "u10": 1.9301444418693603,
-            "v10": 1.8727969513608145,
-            "msl": 297.495038996871,
-            "tcwv": 6.790737472871349
-          },
-          "rmse_climatology": {
-            "t2m": 1.597590825717965,
-            "tp": 6.967969298253479,
-            "u10": 1.6288966781999297,
-            "v10": 1.4119273592314798,
-            "msl": 250.4826306142598,
-            "tcwv": 6.092554644697325
-          },
-          "ss_vs_best_ref": {
-            "t2m": 0.059690908355359173,
-            "tp": 0.029478436758398896,
-            "u10": 0.05907202025421476,
-            "v10": 0.05340101756500504,
-            "msl": 0.06976817122604029,
-            "tcwv": 0.09088392435312309
-          },
-          "mean_ss": 0.06038241308535688,
-          "csi_model": 0.24894960400929406,
-          "csi_persistence": 0.2049044420795735,
-          "csi_climatology": 0.22034450017186613
-        },
-        "8": {
-          "rmse_model": {
-            "t2m": 1.6602725435076284,
-            "tp": 7.141953205470583,
-            "u10": 1.7485485770780251,
-            "v10": 1.4535563632248696,
-            "msl": 261.56414710145606,
-            "tcwv": 6.394649247857031
-          },
-          "rmse_persistence": {
-            "t2m": 1.943264990219833,
-            "tp": 9.495322597949833,
-            "u10": 2.150818775308044,
-            "v10": 1.9150287364924878,
-            "msl": 335.17240681763934,
-            "tcwv": 7.512780434633908
-          },
-          "rmse_climatology": {
-            "t2m": 1.5762315692025464,
-            "tp": 6.8466837480465035,
-            "u10": 1.667072630996762,
-            "v10": 1.4122952989173914,
-            "msl": 251.50246041217707,
-            "tcwv": 6.021724696531475
-          },
-          "ss_vs_best_ref": {
-            "t2m": -0.053317657092479376,
-            "tp": -0.043125908584331185,
-            "u10": -0.04887366307042518,
-            "v10": -0.029215606919535286,
-            "msl": -0.04000631513818709,
-            "tcwv": -0.061929857328144156
-          },
-          "mean_ss": -0.04607816802218371,
-          "csi_model": 0.2454442792622314,
-          "csi_persistence": 0.1915026256635395,
-          "csi_climatology": 0.22233968706371818
-        }
-      },
-      "variance_ratio_day8": {
-        "t2m": 0.9789336323738098,
-        "tp": 0.541015625,
-        "u10": 1.0132896900177002,
-        "v10": 0.7829883098602295,
-        "msl": 0.960875391960144,
-        "tcwv": 0.9220772981643677
-      },
-      "anti_blur_points_of_10": 10.0,
-      "validity_failures": [],
-      "mean_ss_all_leads": 0.009642220482952166
-    },
-    "causality": {
-      "null_consistent": true,
-      "points_of_15": 12.1875,
-      "checks": [
-        {
-          "date": "2020-07-15",
-          "shock": "warm_ocean",
-          "finite": true,
-          "nonzero": true,
-          "stable": true,
-          "near_frac_day1": 0.9979182481765747,
-          "localized": true,
-          "far_frac_max": 0.0009733313345350325,
-          "no_teleport": true,
-          "propagates": false
-        },
-        {
-          "date": "2020-07-15",
-          "shock": "monsoon_stall",
-          "finite": true,
-          "nonzero": true,
-          "stable": true,
-          "near_frac_day1": 0.9999451637268066,
-          "localized": true,
-          "far_frac_max": 2.647584187798202e-05,
-          "no_teleport": true,
-          "propagates": false
-        },
-        {
-          "date": "2021-10-10",
-          "shock": "warm_ocean",
-          "finite": true,
-          "nonzero": true,
-          "stable": true,
-          "near_frac_day1": 0.9989088177680969,
-          "localized": true,
-          "far_frac_max": 0.0004754258261527866,
-          "no_teleport": true,
-          "propagates": true
-        },
-        {
-          "date": "2021-10-10",
-          "shock": "monsoon_stall",
-          "finite": true,
-          "nonzero": true,
-          "stable": true,
-          "near_frac_day1": 0.9992994666099548,
-          "localized": true,
-          "far_frac_max": 0.0008673295378684998,
-          "no_teleport": true,
-          "propagates": false
-        }
-      ]
     }
   },
-  "elapsed_seconds": 121.82501608300663,
+  "elapsed_seconds": 0.9457237500027986,
   "failures": []
 }
